@@ -12,7 +12,8 @@ import {
   UserX,
   Edit,
   Lock,
-  Loader2
+  Loader2,
+  Percent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,14 @@ import {
 } from '@/types/crm';
 import { z } from 'zod';
 
+interface ComissaoConfig {
+  id: string;
+  tipo: string;
+  valor_referencia: string;
+  percentual: number;
+  ativo: boolean;
+}
+
 const createUserSchema = z.object({
   nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   email: z.string().email('Email inválido'),
@@ -83,6 +92,7 @@ export default function Equipe() {
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [comissoes, setComissoes] = useState<ComissaoConfig[]>([]);
 
   const [editForm, setEditForm] = useState({
     nivel_corretor: '' as NivelCorretor | '',
@@ -99,7 +109,29 @@ export default function Equipe() {
 
   useEffect(() => {
     fetchUsers();
+    fetchComissoes();
   }, []);
+
+  const fetchComissoes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('comissao_config')
+        .select('*')
+        .eq('tipo', 'CORRETOR_NIVEL')
+        .eq('ativo', true);
+
+      if (error) throw error;
+      setComissoes(data || []);
+    } catch (error) {
+      console.error('Error fetching comissoes:', error);
+    }
+  };
+
+  const getComissaoByNivel = (nivel: NivelCorretor | null) => {
+    if (!nivel) return null;
+    const config = comissoes.find(c => c.valor_referencia === nivel);
+    return config?.percentual;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -485,9 +517,17 @@ export default function Equipe() {
                       </TableCell>
                       <TableCell>
                         {user.nivel_corretor && (
-                          <Badge variant="outline">
-                            {NIVEL_CORRETOR_LABELS[user.nivel_corretor]}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline">
+                              {NIVEL_CORRETOR_LABELS[user.nivel_corretor]}
+                            </Badge>
+                            {isDirector && getComissaoByNivel(user.nivel_corretor) !== null && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Percent className="h-3 w-3" />
+                                {getComissaoByNivel(user.nivel_corretor)}% comissão
+                              </span>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>

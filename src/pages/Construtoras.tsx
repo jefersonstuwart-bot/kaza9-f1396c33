@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -9,7 +9,9 @@ import {
   MoreHorizontal,
   Percent,
   Edit,
-  Trash2
+  Trash2,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +55,8 @@ export default function Construtoras() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -79,6 +83,65 @@ export default function Construtoras() {
       console.error('Error fetching construtoras:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadPhoto = async (file: File) => {
+    try {
+      setUploading(true);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = fileName;
+
+      const { error: uploadError } = await supabase.storage
+        .from('construtoras')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('construtoras')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, foto_url: publicUrl });
+
+      toast({
+        title: 'Foto enviada!',
+        description: 'A foto foi carregada com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível enviar a foto.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'Arquivo muito grande',
+          description: 'O arquivo deve ter no máximo 5MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Formato inválido',
+          description: 'Apenas imagens são permitidas.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      handleUploadPhoto(file);
     }
   };
 
@@ -237,8 +300,58 @@ export default function Construtoras() {
                   />
                 </div>
                 
+                {/* Photo Upload Section */}
                 <div className="space-y-2">
-                  <Label htmlFor="foto_url">URL da Foto</Label>
+                  <Label>Foto do Perfil</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                      {formData.foto_url ? (
+                        <img 
+                          src={formData.foto_url} 
+                          alt="Preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Building2 className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            Enviar Foto
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        PNG, JPG até 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="foto_url">Ou URL da Foto</Label>
                   <Input
                     id="foto_url"
                     placeholder="https://..."
@@ -291,7 +404,7 @@ export default function Construtoras() {
                 }}>
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving || uploading}>
                   {saving ? 'Salvando...' : 'Salvar'}
                 </Button>
               </DialogFooter>
