@@ -629,12 +629,19 @@ export default function Equipe() {
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveUser} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar'}
+            <Button onClick={handleSaveUser} disabled={saving} className="gap-2">
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Alterações'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -715,14 +722,14 @@ export default function Equipe() {
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateUser} disabled={creating}>
+            <Button onClick={handleCreateUser} disabled={creating} className="gap-2">
               {creating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Criando...
                 </>
               ) : (

@@ -10,7 +10,8 @@ import {
   Mail,
   Calendar,
   User,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -317,12 +318,19 @@ export default function Leads() {
               </div>
             </div>
             
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateLead} disabled={saving}>
-                {saving ? 'Salvando...' : 'Salvar Lead'}
+              <Button onClick={handleCreateLead} disabled={saving} className="gap-2">
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Lead'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
