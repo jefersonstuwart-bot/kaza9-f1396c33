@@ -24,7 +24,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -271,152 +270,170 @@ export default function Construtoras() {
         </div>
         
         {isDirector && (
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nova Construtora
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingId ? 'Editar' : 'Adicionar'} Construtora</DialogTitle>
-                <DialogDescription>
-                  Preencha os dados da construtora
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome *</Label>
-                  <Input
-                    id="nome"
-                    placeholder="Nome da construtora"
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  />
-                </div>
+          <>
+            <Button className="gap-2" onClick={() => {
+              resetForm();
+              setIsDialogOpen(true);
+            }}>
+              <Plus className="h-4 w-4" />
+              Nova Construtora
+            </Button>
+            
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingId ? 'Editar' : 'Adicionar'} Construtora</DialogTitle>
+                  <DialogDescription>
+                    Preencha os dados da construtora
+                  </DialogDescription>
+                </DialogHeader>
                 
-                {/* Photo Upload Section */}
-                <div className="space-y-2">
-                  <Label>Foto do Perfil</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
-                      {formData.foto_url ? (
-                        <img 
-                          src={formData.foto_url} 
-                          alt="Preview"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Building2 className="h-8 w-8 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                      >
-                        {uploading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Enviando...
-                          </>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nome">Nome *</Label>
+                    <Input
+                      id="nome"
+                      placeholder="Nome da construtora"
+                      value={formData.nome}
+                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    />
+                  </div>
+                  
+                  {/* Photo Upload Section */}
+                  <div className="space-y-2">
+                    <Label>Foto do Perfil</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                        {formData.foto_url ? (
+                          <img 
+                            src={formData.foto_url} 
+                            alt="Preview"
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
-                          <>
-                            <Upload className="h-4 w-4" />
-                            Enviar Foto
-                          </>
+                          <Building2 className="h-8 w-8 text-muted-foreground" />
                         )}
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        PNG, JPG até 5MB
-                      </p>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-2"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4" />
+                              Enviar Foto
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG até 5MB
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="foto_url">Ou URL da Foto</Label>
-                  <Input
-                    id="foto_url"
-                    placeholder="https://..."
-                    value={formData.foto_url}
-                    onChange={(e) => setFormData({ ...formData, foto_url: e.target.value })}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="foto_url">Ou URL da Foto</Label>
+                    <Input
+                      id="foto_url"
+                      placeholder="https://..."
+                      value={formData.foto_url}
+                      onChange={(e) => setFormData({ ...formData, foto_url: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="drive_url">Link do Google Drive</Label>
+                    <Input
+                      id="drive_url"
+                      placeholder="https://drive.google.com/..."
+                      value={formData.drive_url}
+                      onChange={(e) => setFormData({ ...formData, drive_url: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="percentual_comissao">Percentual de Comissão (%)</Label>
+                    <Input
+                      id="percentual_comissao"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.percentual_comissao}
+                      onChange={(e) => setFormData({ ...formData, percentual_comissao: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Visível apenas para diretores
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ativo">Ativa</Label>
+                    <Switch
+                      id="ativo"
+                      checked={formData.ativo}
+                      onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
+                    />
+                  </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="drive_url">Link do Google Drive</Label>
-                  <Input
-                    id="drive_url"
-                    placeholder="https://drive.google.com/..."
-                    value={formData.drive_url}
-                    onChange={(e) => setFormData({ ...formData, drive_url: e.target.value })}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="percentual_comissao">Percentual de Comissão (%)</Label>
-                  <Input
-                    id="percentual_comissao"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.percentual_comissao}
-                    onChange={(e) => setFormData({ ...formData, percentual_comissao: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Visível apenas para diretores
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="ativo">Ativa</Label>
-                  <Switch
-                    id="ativo"
-                    checked={formData.ativo}
-                    onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
-                  />
-                </div>
-              </div>
-              
-              <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
-                <Button variant="outline" onClick={() => {
-                  setIsDialogOpen(false);
-                  resetForm();
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave} disabled={saving || uploading} className="gap-2">
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Construtora'
+                <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
+                  {editingId && (
+                    <Button 
+                      variant="destructive" 
+                      onClick={() => {
+                        handleDelete(editingId);
+                        setIsDialogOpen(false);
+                        resetForm();
+                      }}
+                      className="gap-2 sm:mr-auto"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
+                    </Button>
                   )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  <Button variant="outline" onClick={() => {
+                    setIsDialogOpen(false);
+                    resetForm();
+                  }}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave} disabled={saving || uploading} className="gap-2">
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar Construtora'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
 
