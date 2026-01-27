@@ -11,7 +11,8 @@ import {
   Calendar,
   User,
   ChevronDown,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { LEAD_STATUS_CONFIG, type Lead, type LeadOrigem, type LeadStatus } from '@/types/crm';
+import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
 import { z } from 'zod';
 
 const leadSchema = z.object({
@@ -71,6 +73,8 @@ export default function Leads() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form state
@@ -201,6 +205,11 @@ export default function Leads() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleOpenDetails = (lead: Lead) => {
+    setSelectedLead(lead);
+    setIsDetailsDialogOpen(true);
   };
 
   const filteredLeads = leads.filter((lead) => {
@@ -490,8 +499,10 @@ export default function Leads() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver detalhes</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenDetails(lead)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver detalhes
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive">
                               Excluir
@@ -507,6 +518,15 @@ export default function Leads() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Lead Details Dialog */}
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        origens={origens}
+        onLeadUpdated={fetchLeads}
+      />
     </div>
   );
 }
