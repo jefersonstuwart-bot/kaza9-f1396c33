@@ -317,12 +317,12 @@ export default function Leads() {
               </div>
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleCreateLead} disabled={saving}>
-                {saving ? 'Salvando...' : 'Salvar'}
+                {saving ? 'Salvando...' : 'Salvar Lead'}
               </Button>
             </DialogFooter>
           </DialogContent>
