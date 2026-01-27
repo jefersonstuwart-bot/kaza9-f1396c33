@@ -397,15 +397,22 @@ export default function Construtoras() {
                 </div>
               </div>
               
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                 <Button variant="outline" onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
                 }}>
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} disabled={saving || uploading}>
-                  {saving ? 'Salvando...' : 'Salvar'}
+                <Button onClick={handleSave} disabled={saving || uploading} className="gap-2">
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Salvar Construtora'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
