@@ -98,6 +98,7 @@ export default function Equipe() {
     nivel_corretor: '' as NivelCorretor | '',
     gerente_id: '',
     ativo: true,
+    percentual_comissao: '',
   });
 
   const [createForm, setCreateForm] = useState({
@@ -168,10 +169,12 @@ export default function Equipe() {
 
   const handleEditUser = (user: UserWithRole) => {
     setSelectedUser(user);
+    const comissao = user.nivel_corretor ? getComissaoByNivel(user.nivel_corretor) : null;
     setEditForm({
       nivel_corretor: user.nivel_corretor || '',
       gerente_id: user.gerente_id || '',
       ativo: user.ativo,
+      percentual_comissao: comissao?.toString() || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -192,6 +195,34 @@ export default function Equipe() {
         .eq('id', selectedUser.id);
 
       if (error) throw error;
+
+      // Atualizar comissão do nível se tiver nível definido e percentual alterado
+      if (editForm.nivel_corretor && editForm.percentual_comissao) {
+        const percentual = parseFloat(editForm.percentual_comissao);
+        if (!isNaN(percentual) && percentual >= 0 && percentual <= 100) {
+          // Verificar se já existe config para este nível
+          const existingConfig = comissoes.find(c => c.valor_referencia === editForm.nivel_corretor);
+          
+          if (existingConfig) {
+            await supabase
+              .from('comissao_config')
+              .update({ percentual })
+              .eq('id', existingConfig.id);
+          } else {
+            await supabase
+              .from('comissao_config')
+              .insert({
+                tipo: 'CORRETOR_NIVEL',
+                valor_referencia: editForm.nivel_corretor,
+                percentual,
+                ativo: true,
+              });
+          }
+          
+          // Atualizar lista de comissões
+          fetchComissoes();
+        }
+      }
 
       toast({
         title: 'Usuário atualizado!',
@@ -599,6 +630,30 @@ export default function Equipe() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Campo de Percentual de Comissão - visível apenas se tiver nível */}
+            {editForm.nivel_corretor && (
+              <div className="space-y-2">
+                <Label htmlFor="percentual_comissao">Percentual de Comissão (%)</Label>
+                <div className="relative">
+                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="percentual_comissao"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={editForm.percentual_comissao}
+                    onChange={(e) => setEditForm({ ...editForm, percentual_comissao: e.target.value })}
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Comissão do nível {NIVEL_CORRETOR_LABELS[editForm.nivel_corretor as NivelCorretor]} sobre cada venda
+                </p>
+              </div>
+            )}
             
             <div className="space-y-2">
               <Label>Gerente</Label>
