@@ -563,14 +563,14 @@ export default function Equipe() {
             <div className="space-y-2">
               <Label>Gerente</Label>
               <Select
-                value={editForm.gerente_id}
-                onValueChange={(value) => setEditForm({ ...editForm, gerente_id: value })}
+                value={editForm.gerente_id || "none"}
+                onValueChange={(value) => setEditForm({ ...editForm, gerente_id: value === "none" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o gerente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {gerentes.map((g) => (
                     <SelectItem key={g.id} value={g.id}>
                       {g.nome}
