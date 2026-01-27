@@ -283,7 +283,7 @@ export default function Construtoras() {
               setIsDialogOpen(open);
               if (!open) resetForm();
             }}>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>{editingId ? 'Editar' : 'Adicionar'} Construtora</DialogTitle>
                   <DialogDescription>
@@ -291,7 +291,7 @@ export default function Construtoras() {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 overflow-y-auto flex-1">
                   <div className="space-y-2">
                     <Label htmlFor="nome">Nome *</Label>
                     <Input
