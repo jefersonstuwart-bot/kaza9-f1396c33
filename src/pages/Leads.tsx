@@ -245,7 +245,7 @@ export default function Leads() {
               Novo Lead
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Adicionar Lead</DialogTitle>
               <DialogDescription>
@@ -253,7 +253,7 @@ export default function Leads() {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome *</Label>
                 <Input
