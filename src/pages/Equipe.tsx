@@ -10,7 +10,9 @@ import {
   Shield,
   UserCheck,
   UserX,
-  Edit
+  Edit,
+  Lock,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,14 @@ import {
   type UserRole, 
   type NivelCorretor 
 } from '@/types/crm';
+import { z } from 'zod';
+
+const createUserSchema = z.object({
+  nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+  role: z.enum(['DIRETOR', 'GERENTE', 'CORRETOR']),
+});
 
 interface UserWithRole extends Profile {
   role?: UserRole;
@@ -69,13 +79,22 @@ export default function Equipe() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const [editForm, setEditForm] = useState({
     nivel_corretor: '' as NivelCorretor | '',
     gerente_id: '',
     ativo: true,
+  });
+
+  const [createForm, setCreateForm] = useState({
+    nome: '',
+    email: '',
+    password: '',
+    role: 'CORRETOR' as UserRole,
   });
 
   useEffect(() => {
@@ -229,6 +248,78 @@ export default function Equipe() {
     ativos: users.filter(u => u.ativo).length,
   };
 
+  const handleCreateUser = async () => {
+    try {
+      setCreating(true);
+
+      const validation = createUserSchema.safeParse(createForm);
+      if (!validation.success) {
+        toast({
+          title: 'Erro de validação',
+          description: validation.error.errors[0].message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Create user via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: createForm.email,
+        password: createForm.password,
+        options: {
+          data: { nome: createForm.nome }
+        }
+      });
+
+      if (authError) {
+        let message = 'Erro ao criar usuário';
+        if (authError.message.includes('already registered')) {
+          message = 'Este email já está cadastrado';
+        }
+        toast({
+          title: 'Erro',
+          description: message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (authData.user) {
+        // Update the user's role if not CORRETOR (default)
+        if (createForm.role !== 'CORRETOR') {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .update({ role: createForm.role })
+            .eq('user_id', authData.user.id);
+
+          if (roleError) {
+            console.error('Error updating role:', roleError);
+          }
+        }
+
+        toast({
+          title: 'Usuário criado!',
+          description: `${createForm.nome} foi cadastrado com sucesso.`,
+        });
+
+        setIsCreateDialogOpen(false);
+        setCreateForm({ nome: '', email: '', password: '', role: 'CORRETOR' });
+        
+        // Wait a moment for the trigger to create the profile
+        setTimeout(() => fetchUsers(), 1000);
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar o usuário.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -237,6 +328,12 @@ export default function Equipe() {
           <h1 className="text-3xl font-display font-bold text-foreground">Equipe</h1>
           <p className="text-muted-foreground">Gerencie os membros da sua equipe</p>
         </div>
+        {isDirector && (
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Usuário
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -498,6 +595,99 @@ export default function Equipe() {
             </Button>
             <Button onClick={handleSaveUser} disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Cadastre um novo membro para a equipe
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-nome">Nome completo</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="create-nome"
+                  placeholder="Nome do usuário"
+                  value={createForm.nome}
+                  onChange={(e) => setCreateForm({ ...createForm, nome: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="create-email"
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Senha inicial</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="create-password"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Perfil</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(value) => setCreateForm({ ...createForm, role: value as UserRole })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o perfil" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(USER_ROLE_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={creating}>
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                'Criar Usuário'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
