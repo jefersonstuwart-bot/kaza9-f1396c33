@@ -16,7 +16,8 @@ import {
   Percent,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +111,13 @@ export default function Equipe() {
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [comissoes, setComissoes] = useState<ComissaoConfig[]>([]);
   const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [isMetaDialogOpen, setIsMetaDialogOpen] = useState(false);
+  const [selectedUserForMeta, setSelectedUserForMeta] = useState<UserWithRole | null>(null);
+  const [savingMeta, setSavingMeta] = useState(false);
+  const [metaForm, setMetaForm] = useState({
+    meta_vgv: '',
+    meta_qtd_vendas: '',
+  });
 
   const [editForm, setEditForm] = useState({
     nivel_corretor: '' as NivelCorretor | '',
@@ -378,6 +386,103 @@ export default function Equipe() {
   const openDeleteDialog = (user: UserWithRole) => {
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
+  };
+
+  const openMetaDialog = async (user: UserWithRole) => {
+    setSelectedUserForMeta(user);
+    
+    // Fetch current meta for this user
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    const { data: meta } = await supabase
+      .from('metas')
+      .select('meta_vgv, meta_qtd_vendas')
+      .eq('usuario_id', user.id)
+      .eq('mes', currentMonth)
+      .eq('ano', currentYear)
+      .maybeSingle();
+    
+    setMetaForm({
+      meta_vgv: meta?.meta_vgv?.toString() || '',
+      meta_qtd_vendas: meta?.meta_qtd_vendas?.toString() || '',
+    });
+    
+    setIsMetaDialogOpen(true);
+  };
+
+  const handleSaveMeta = async () => {
+    if (!selectedUserForMeta) return;
+
+    try {
+      setSavingMeta(true);
+      
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      
+      const metaData = {
+        usuario_id: selectedUserForMeta.id,
+        mes: currentMonth,
+        ano: currentYear,
+        meta_vgv: metaForm.meta_vgv ? parseFloat(metaForm.meta_vgv.replace(/\D/g, '')) / 100 : null,
+        meta_qtd_vendas: metaForm.meta_qtd_vendas ? parseInt(metaForm.meta_qtd_vendas) : null,
+      };
+
+      // Check if meta exists
+      const { data: existingMeta } = await supabase
+        .from('metas')
+        .select('id')
+        .eq('usuario_id', selectedUserForMeta.id)
+        .eq('mes', currentMonth)
+        .eq('ano', currentYear)
+        .maybeSingle();
+
+      if (existingMeta) {
+        // Update
+        const { error } = await supabase
+          .from('metas')
+          .update({
+            meta_vgv: metaData.meta_vgv,
+            meta_qtd_vendas: metaData.meta_qtd_vendas,
+          })
+          .eq('id', existingMeta.id);
+
+        if (error) throw error;
+      } else {
+        // Insert
+        const { error } = await supabase
+          .from('metas')
+          .insert(metaData);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Meta salva!',
+        description: `Meta de ${selectedUserForMeta.nome} atualizada com sucesso.`,
+      });
+
+      setIsMetaDialogOpen(false);
+      setSelectedUserForMeta(null);
+    } catch (error) {
+      console.error('Error saving meta:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar a meta.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingMeta(false);
+    }
+  };
+
+  const formatCurrencyInput = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    const amount = Number(numbers) / 100;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount);
   };
 
   const getRoleBadgeColor = (role?: UserRole) => {
@@ -677,10 +782,16 @@ export default function Equipe() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               {isDirector && (
-                                <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openMetaDialog(user)}>
+                                    <Target className="h-4 w-4 mr-2" />
+                                    Definir Meta
+                                  </DropdownMenuItem>
+                                </>
                               )}
                               <DropdownMenuItem onClick={() => handleToggleAtivo(user)}>
                                 {user.ativo ? (
@@ -964,6 +1075,71 @@ export default function Equipe() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Meta Dialog */}
+      <Dialog open={isMetaDialogOpen} onOpenChange={setIsMetaDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-accent" />
+              Definir Meta
+            </DialogTitle>
+            <DialogDescription>
+              Configure a meta mensal de {selectedUserForMeta?.nome}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+              Mês atual: {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="meta_vgv">Meta de VGV</Label>
+              <Input
+                id="meta_vgv"
+                placeholder="R$ 0,00"
+                value={metaForm.meta_vgv ? formatCurrencyInput(metaForm.meta_vgv) : ''}
+                onChange={(e) => setMetaForm({ ...metaForm, meta_vgv: e.target.value.replace(/\D/g, '') })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Valor total de vendas esperado no mês
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="meta_qtd_vendas">Meta de Quantidade de Vendas</Label>
+              <Input
+                id="meta_qtd_vendas"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={metaForm.meta_qtd_vendas}
+                onChange={(e) => setMetaForm({ ...metaForm, meta_qtd_vendas: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Número de vendas esperado no mês
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsMetaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveMeta} disabled={savingMeta} className="gap-2">
+              {savingMeta ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Meta'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
