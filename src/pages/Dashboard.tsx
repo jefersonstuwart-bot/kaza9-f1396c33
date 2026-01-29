@@ -8,12 +8,10 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownRight,
-  Building2,
-  Calendar
+  Minus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { LEAD_STATUS_CONFIG, type LeadStatus } from '@/types/crm';
 import {
   BarChart,
@@ -31,10 +29,13 @@ import ComissaoCorretorCard from '@/components/comissao/ComissaoCorretorCard';
 
 interface DashboardData {
   totalLeads: number;
+  totalLeadsMesAnterior: number;
   leadsByStatus: Record<string, number>;
   totalVendas: number;
   vendasAtivas: number;
+  vendasAtivasMesAnterior: number;
   vgvTotal: number;
+  vgvTotalMesAnterior: number;
   metaVgv: number;
   metaQtdVendas: number;
   realizadoVgv: number;
@@ -51,13 +52,16 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
 };
 
 export default function Dashboard() {
-  const { profile, role, isDirector, isGerente } = useAuth();
+  const { profile } = useAuth();
   const [data, setData] = useState<DashboardData>({
     totalLeads: 0,
+    totalLeadsMesAnterior: 0,
     leadsByStatus: {},
     totalVendas: 0,
     vendasAtivas: 0,
+    vendasAtivasMesAnterior: 0,
     vgvTotal: 0,
+    vgvTotalMesAnterior: 0,
     metaVgv: 0,
     metaQtdVendas: 0,
     realizadoVgv: 0,
@@ -73,49 +77,99 @@ export default function Dashboard() {
     if (!profile) return;
 
     try {
-      // Fetch leads
-      const { data: leads, error: leadsError } = await supabase
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+      
+      // Calculate previous month
+      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+      
+      // Date ranges for current month
+      const currentMonthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+      const currentMonthEnd = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+      
+      // Date ranges for previous month
+      const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+      const prevMonthEnd = new Date(prevYear, prevMonth, 0).toISOString().split('T')[0];
+
+      // Fetch all leads for status distribution
+      const { data: allLeads, error: allLeadsError } = await supabase
         .from('leads')
         .select('status');
 
-      if (leadsError) throw leadsError;
+      if (allLeadsError) throw allLeadsError;
 
       // Count leads by status
       const leadsByStatus: Record<string, number> = {};
-      leads?.forEach(lead => {
+      allLeads?.forEach(lead => {
         leadsByStatus[lead.status] = (leadsByStatus[lead.status] || 0) + 1;
       });
 
-      // Fetch vendas
-      const { data: vendas, error: vendasError } = await supabase
+      // Fetch leads created in current month
+      const { data: leadsCurrentMonth, error: leadsCurrentError } = await supabase
+        .from('leads')
+        .select('id')
+        .gte('data_criacao', currentMonthStart)
+        .lte('data_criacao', `${currentMonthEnd}T23:59:59`);
+
+      if (leadsCurrentError) throw leadsCurrentError;
+
+      // Fetch leads created in previous month
+      const { data: leadsPrevMonth, error: leadsPrevError } = await supabase
+        .from('leads')
+        .select('id')
+        .gte('data_criacao', prevMonthStart)
+        .lte('data_criacao', `${prevMonthEnd}T23:59:59`);
+
+      if (leadsPrevError) throw leadsPrevError;
+
+      // Fetch vendas for current month
+      const { data: vendasCurrentMonth, error: vendasCurrentError } = await supabase
         .from('vendas')
-        .select('valor_vgv, status');
+        .select('valor_vgv, status')
+        .gte('data_venda', currentMonthStart)
+        .lte('data_venda', currentMonthEnd);
 
-      if (vendasError) throw vendasError;
+      if (vendasCurrentError) throw vendasCurrentError;
 
-      const vendasAtivas = vendas?.filter(v => v.status === 'ATIVA') || [];
-      const vgvTotal = vendasAtivas.reduce((sum, v) => sum + Number(v.valor_vgv), 0);
+      // Fetch vendas for previous month
+      const { data: vendasPrevMonth, error: vendasPrevError } = await supabase
+        .from('vendas')
+        .select('valor_vgv, status')
+        .gte('data_venda', prevMonthStart)
+        .lte('data_venda', prevMonthEnd);
+
+      if (vendasPrevError) throw vendasPrevError;
+
+      const vendasAtivasCurrentMonth = vendasCurrentMonth?.filter(v => v.status === 'ATIVA') || [];
+      const vendasAtivasPrevMonth = vendasPrevMonth?.filter(v => v.status === 'ATIVA') || [];
+      
+      const vgvCurrentMonth = vendasAtivasCurrentMonth.reduce((sum, v) => sum + Number(v.valor_vgv), 0);
+      const vgvPrevMonth = vendasAtivasPrevMonth.reduce((sum, v) => sum + Number(v.valor_vgv), 0);
 
       // Fetch metas for current month
-      const currentDate = new Date();
-      const { data: meta, error: metaError } = await supabase
+      const { data: meta } = await supabase
         .from('metas')
         .select('meta_vgv, meta_qtd_vendas')
         .eq('usuario_id', profile.id)
-        .eq('mes', currentDate.getMonth() + 1)
-        .eq('ano', currentDate.getFullYear())
+        .eq('mes', currentMonth)
+        .eq('ano', currentYear)
         .maybeSingle();
 
       setData({
-        totalLeads: leads?.length || 0,
+        totalLeads: leadsCurrentMonth?.length || 0,
+        totalLeadsMesAnterior: leadsPrevMonth?.length || 0,
         leadsByStatus,
-        totalVendas: vendas?.length || 0,
-        vendasAtivas: vendasAtivas.length,
-        vgvTotal,
+        totalVendas: vendasCurrentMonth?.length || 0,
+        vendasAtivas: vendasAtivasCurrentMonth.length,
+        vendasAtivasMesAnterior: vendasAtivasPrevMonth.length,
+        vgvTotal: vgvCurrentMonth,
+        vgvTotalMesAnterior: vgvPrevMonth,
         metaVgv: meta?.meta_vgv || 0,
         metaQtdVendas: meta?.meta_qtd_vendas || 0,
-        realizadoVgv: vgvTotal,
-        realizadoQtdVendas: vendasAtivas.length,
+        realizadoVgv: vgvCurrentMonth,
+        realizadoQtdVendas: vendasAtivasCurrentMonth.length,
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -136,6 +190,43 @@ export default function Dashboard() {
   const getProgressPercentage = (realized: number, goal: number) => {
     if (goal === 0) return 0;
     return Math.min((realized / goal) * 100, 100);
+  };
+
+  const calculateVariation = (current: number, previous: number) => {
+    if (previous === 0) {
+      if (current === 0) return { percentage: 0, isPositive: true, isZero: true };
+      return { percentage: 100, isPositive: true, isZero: false };
+    }
+    const percentage = ((current - previous) / previous) * 100;
+    return { 
+      percentage: Math.abs(percentage), 
+      isPositive: percentage >= 0, 
+      isZero: percentage === 0 
+    };
+  };
+
+  const VariationIndicator = ({ current, previous }: { current: number; previous: number }) => {
+    const { percentage, isPositive, isZero } = calculateVariation(current, previous);
+    
+    if (isZero) {
+      return (
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Minus className="h-4 w-4" />
+          <span>Sem variação</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-accent' : 'text-destructive'}`}>
+        {isPositive ? (
+          <ArrowUpRight className="h-4 w-4" />
+        ) : (
+          <ArrowDownRight className="h-4 w-4" />
+        )}
+        <span>{isPositive ? '+' : '-'}{percentage.toFixed(0)}% vs mês anterior</span>
+      </div>
+    );
   };
 
   const pieChartData = Object.entries(data.leadsByStatus).map(([status, count]) => ({
@@ -172,48 +263,48 @@ export default function Dashboard() {
         <Card className="card-metric">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total de Leads
+              Leads do Mês
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{data.totalLeads}</div>
-            <div className="flex items-center gap-1 text-sm text-accent">
-              <ArrowUpRight className="h-4 w-4" />
-              <span>+12% este mês</span>
-            </div>
+            <VariationIndicator 
+              current={data.totalLeads} 
+              previous={data.totalLeadsMesAnterior} 
+            />
           </CardContent>
         </Card>
 
         <Card className="card-metric">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Vendas Ativas
+              Vendas do Mês
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{data.vendasAtivas}</div>
-            <div className="flex items-center gap-1 text-sm text-accent">
-              <ArrowUpRight className="h-4 w-4" />
-              <span>+8% este mês</span>
-            </div>
+            <VariationIndicator 
+              current={data.vendasAtivas} 
+              previous={data.vendasAtivasMesAnterior} 
+            />
           </CardContent>
         </Card>
 
         <Card className="card-metric">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              VGV Total
+              VGV do Mês
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{formatCurrency(data.vgvTotal)}</div>
-            <div className="flex items-center gap-1 text-sm text-accent">
-              <ArrowUpRight className="h-4 w-4" />
-              <span>+15% este mês</span>
-            </div>
+            <VariationIndicator 
+              current={data.vgvTotal} 
+              previous={data.vgvTotalMesAnterior} 
+            />
           </CardContent>
         </Card>
 
