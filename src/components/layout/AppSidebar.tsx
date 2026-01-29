@@ -76,13 +76,22 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
         <div className="flex items-center justify-center">
-          <img 
-            src={logoKaza9} 
-            alt="KAZA9 Imóveis" 
-            className={collapsed ? "h-10 w-auto" : "h-14 w-auto"}
-          />
+          <div className={`flex flex-col items-center transition-all duration-300 ${collapsed ? 'gap-0' : 'gap-2'}`}>
+            <img 
+              src={logoKaza9} 
+              alt="KAZA9 Imóveis" 
+              className={`transition-all duration-300 object-contain ${collapsed ? "h-10 w-10" : "h-16 w-auto"}`}
+            />
+            {!collapsed && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] uppercase tracking-[0.25em] text-sidebar-foreground/60 font-medium">
+                  CRM Imobiliário
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </SidebarHeader>
 
