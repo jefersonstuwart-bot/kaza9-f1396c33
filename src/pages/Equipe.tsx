@@ -14,7 +14,9 @@ import {
   Lock,
   Loader2,
   Percent,
-  Trash2
+  Trash2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +109,7 @@ export default function Equipe() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [comissoes, setComissoes] = useState<ComissaoConfig[]>([]);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   const [editForm, setEditForm] = useState({
     nivel_corretor: '' as NivelCorretor | '',
@@ -864,12 +867,23 @@ export default function Equipe() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="create-password"
-                  type="password"
+                  type={showCreatePassword ? "text" : "password"}
                   placeholder="Mínimo 6 caracteres"
                   value={createForm.password}
                   onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  className="pl-10"
+                  className="pl-10 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePassword(!showCreatePassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showCreatePassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
