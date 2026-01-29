@@ -283,6 +283,33 @@ export default function Equipe() {
       .toUpperCase();
   };
 
+  const handleToggleAtivo = async (user: UserWithRole) => {
+    try {
+      const newStatus = !user.ativo;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ativo: newStatus })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: newStatus ? 'Login ativado!' : 'Login desativado!',
+        description: `${user.nome} ${newStatus ? 'agora pode' : 'não pode mais'} acessar o sistema.`,
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível alterar o status do usuário.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getRoleBadgeColor = (role?: UserRole) => {
     switch (role) {
       case 'DIRETOR':
@@ -571,7 +598,7 @@ export default function Equipe() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {isDirector && (
+                        {(isDirector || (isGerente && user.gerente_id === currentProfile?.id)) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -579,9 +606,24 @@ export default function Equipe() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
+                              {isDirector && (
+                                <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => handleToggleAtivo(user)}>
+                                {user.ativo ? (
+                                  <>
+                                    <UserX className="h-4 w-4 mr-2" />
+                                    Desativar Login
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Ativar Login
+                                  </>
+                                )}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
