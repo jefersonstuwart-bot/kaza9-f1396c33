@@ -188,16 +188,22 @@ export default function GerenteComissaoCard() {
               </div>
             </div>
 
-            {/* Comissão Total */}
-            <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
-              <div className="flex items-center gap-2 text-accent text-sm mb-1">
-                <DollarSign className="h-4 w-4" />
-                Comissão Estimada
+          </div>
+
+          {/* Highlighted Commission Value */}
+          <div className="mt-6 bg-gradient-to-br from-accent/20 via-accent/10 to-primary/10 rounded-xl p-6 border-2 border-accent/30 shadow-lg">
+            <div className="flex items-center gap-3 text-accent mb-2">
+              <div className="bg-accent/20 p-2 rounded-full">
+                <DollarSign className="h-6 w-6" />
               </div>
-              <div className="text-3xl font-bold text-accent">
-                R$ {(comissaoData?.valor_comissao || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
+              <span className="font-semibold text-lg">Comissão a Receber</span>
             </div>
+            <p className="text-4xl md:text-5xl font-bold text-accent tracking-tight">
+              R$ {(comissaoData?.valor_comissao || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              {comissaoData?.percentual_aplicado || 0}% aplicado sobre VGV de R$ {(comissaoData?.valor_vgv_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+            </p>
           </div>
 
           {/* Progress to next tier */}
