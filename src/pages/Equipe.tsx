@@ -315,7 +315,10 @@ export default function Equipe() {
     try {
       setCreating(true);
 
-      const validation = createUserSchema.safeParse(createForm);
+      // Gerentes só podem criar corretores
+      const targetRole = isGerente ? 'CORRETOR' : createForm.role;
+
+      const validation = createUserSchema.safeParse({ ...createForm, role: targetRole });
       if (!validation.success) {
         toast({
           title: 'Erro de validação',
@@ -325,52 +328,44 @@ export default function Equipe() {
         return;
       }
 
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: createForm.email,
-        password: createForm.password,
-        options: {
-          data: { nome: createForm.nome }
-        }
+      // Use edge function to create user (handles role and gerente_id assignment)
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: createForm.email,
+          password: createForm.password,
+          nome: createForm.nome,
+          role: targetRole,
+        },
       });
 
-      if (authError) {
-        let message = 'Erro ao criar usuário';
-        if (authError.message.includes('already registered')) {
-          message = 'Este email já está cadastrado';
-        }
+      if (error) {
         toast({
           title: 'Erro',
-          description: message,
+          description: error.message || 'Não foi possível criar o usuário.',
           variant: 'destructive',
         });
         return;
       }
 
-      if (authData.user) {
-        // Update the user's role if not CORRETOR (default)
-        if (createForm.role !== 'CORRETOR') {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .update({ role: createForm.role })
-            .eq('user_id', authData.user.id);
-
-          if (roleError) {
-            console.error('Error updating role:', roleError);
-          }
-        }
-
+      if (data?.error) {
         toast({
-          title: 'Usuário criado!',
-          description: `${createForm.nome} foi cadastrado com sucesso.`,
+          title: 'Erro',
+          description: data.error,
+          variant: 'destructive',
         });
-
-        setIsCreateDialogOpen(false);
-        setCreateForm({ nome: '', email: '', password: '', role: 'CORRETOR' });
-        
-        // Wait a moment for the trigger to create the profile
-        setTimeout(() => fetchUsers(), 1000);
+        return;
       }
+
+      toast({
+        title: 'Usuário criado!',
+        description: `${createForm.nome} foi cadastrado com sucesso.`,
+      });
+
+      setIsCreateDialogOpen(false);
+      setCreateForm({ nome: '', email: '', password: '', role: 'CORRETOR' });
+      
+      // Wait a moment for the trigger to create the profile
+      setTimeout(() => fetchUsers(), 1000);
     } catch (error) {
       console.error('Error creating user:', error);
       toast({
@@ -391,10 +386,10 @@ export default function Equipe() {
           <h1 className="text-3xl font-display font-bold text-foreground">Equipe</h1>
           <p className="text-muted-foreground">Gerencie os membros da sua equipe</p>
         </div>
-        {isDirector && (
+      {(isDirector || isGerente) && (
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Novo Usuário
+            {isGerente ? 'Novo Corretor' : 'Novo Usuário'}
           </Button>
         )}
       </div>
@@ -757,24 +752,34 @@ export default function Equipe() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Perfil</Label>
-              <Select
-                value={createForm.role}
-                onValueChange={(value) => setCreateForm({ ...createForm, role: value as UserRole })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o perfil" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(USER_ROLE_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Gerentes só podem criar corretores, então escondemos o seletor */}
+            {isDirector && (
+              <div className="space-y-2">
+                <Label>Perfil</Label>
+                <Select
+                  value={createForm.role}
+                  onValueChange={(value) => setCreateForm({ ...createForm, role: value as UserRole })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(USER_ROLE_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isGerente && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  O corretor será automaticamente vinculado à sua equipe.
+                </p>
+              </div>
+            )}
           </div>
           
           <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
