@@ -27,6 +27,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import ComissaoCorretorCard from '@/components/comissao/ComissaoCorretorCard';
 
 interface DashboardData {
   totalLeads: number;
@@ -333,7 +334,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Goals Section */}
+      {/* Goals and Commission Section */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="card-elevated">
           <CardHeader>
@@ -419,6 +420,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Commission Card for Corretor */}
+      <ComissaoCorretorCard />
     </div>
   );
 }

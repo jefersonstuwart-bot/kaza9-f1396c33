@@ -408,6 +408,7 @@ export default function Vendas() {
                   <TableHead>Construtora</TableHead>
                   <TableHead>Corretor</TableHead>
                   <TableHead>VGV</TableHead>
+                  <TableHead>Comissão</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -416,7 +417,7 @@ export default function Vendas() {
               <TableBody>
                 {filteredVendas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                       {loading ? 'Carregando...' : 'Nenhuma venda encontrada'}
                     </TableCell>
                   </TableRow>
@@ -449,6 +450,20 @@ export default function Vendas() {
                         <span className="font-semibold text-accent">
                           {formatCurrency(Number(venda.valor_vgv))}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {(venda as any).percentual_comissao != null ? (
+                          <div className="space-y-1">
+                            <span className="font-semibold text-accent">
+                              {formatCurrency(Number((venda as any).valor_comissao) || 0)}
+                            </span>
+                            <p className="text-xs text-muted-foreground">
+                              {(venda as any).percentual_comissao}% • {(venda as any).numero_venda_periodo}ª venda
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   Bell,
-  ChevronDown
+  ChevronDown,
+  Percent
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +44,7 @@ const mainNavItems = [
   { title: 'Leads', url: '/leads', icon: Users },
   { title: 'Vendas', url: '/vendas', icon: TrendingUp },
   { title: 'Construtoras', url: '/construtoras', icon: Building2 },
+  { title: 'Comissões', url: '/comissoes', icon: Percent },
 ];
 
 const managementNavItems = [

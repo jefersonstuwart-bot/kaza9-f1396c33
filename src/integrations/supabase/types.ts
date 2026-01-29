@@ -102,6 +102,60 @@ export type Database = {
         }
         Relationships: []
       }
+      comissao_faixas: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          id: string
+          nivel_corretor: Database["public"]["Enums"]["nivel_corretor"]
+          numero_venda: number
+          percentual: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          nivel_corretor: Database["public"]["Enums"]["nivel_corretor"]
+          numero_venda: number
+          percentual: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          nivel_corretor?: Database["public"]["Enums"]["nivel_corretor"]
+          numero_venda?: number
+          percentual?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      comissao_periodo_config: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       construtoras: {
         Row: {
           ativo: boolean | null
@@ -418,9 +472,12 @@ export type Database = {
           gerente_id: string | null
           id: string
           lead_id: string | null
+          numero_venda_periodo: number | null
           observacao: string | null
+          percentual_comissao: number | null
           status: Database["public"]["Enums"]["venda_status"]
           updated_at: string
+          valor_comissao: number | null
           valor_vgv: number
         }
         Insert: {
@@ -431,9 +488,12 @@ export type Database = {
           gerente_id?: string | null
           id?: string
           lead_id?: string | null
+          numero_venda_periodo?: number | null
           observacao?: string | null
+          percentual_comissao?: number | null
           status?: Database["public"]["Enums"]["venda_status"]
           updated_at?: string
+          valor_comissao?: number | null
           valor_vgv: number
         }
         Update: {
@@ -444,9 +504,12 @@ export type Database = {
           gerente_id?: string | null
           id?: string
           lead_id?: string | null
+          numero_venda_periodo?: number | null
           observacao?: string | null
+          percentual_comissao?: number | null
           status?: Database["public"]["Enums"]["venda_status"]
           updated_at?: string
+          valor_comissao?: number | null
           valor_vgv?: number
         }
         Relationships: [
@@ -485,7 +548,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_commission: {
+        Args: { _corretor_id: string; _data_venda: string; _valor_vgv: number }
+        Returns: {
+          numero_venda: number
+          percentual: number
+          valor_comissao: number
+        }[]
+      }
       get_profile_id: { Args: { _user_id: string }; Returns: string }
+      get_vendas_count_in_period: {
+        Args: { _corretor_id: string; _data_venda: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["user_role"]
