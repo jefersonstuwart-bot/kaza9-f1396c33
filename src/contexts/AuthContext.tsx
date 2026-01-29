@@ -86,11 +86,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error: error as Error | null };
+    
+    if (error) {
+      return { error: error as Error | null };
+    }
+    
+    // Check if user is active
+    if (data.user) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('ativo')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error('Error checking user status:', profileError);
+      }
+      
+      if (profileData && !profileData.ativo) {
+        // User is inactive, sign them out
+        await supabase.auth.signOut();
+        return { 
+          error: new Error('Sua conta foi desativada. Entre em contato com o administrador.') 
+        };
+      }
+    }
+    
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, nome: string) => {
