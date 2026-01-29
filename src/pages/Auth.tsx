@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import logoKaza9 from '@/assets/logo-kaza9.png';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -78,13 +79,11 @@ export default function Auth() {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvZz48L3N2Zz4=')] opacity-30"></div>
         
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-accent/20 rounded-xl">
-              <Building2 className="h-10 w-10 text-accent" />
-            </div>
+          <div className="flex items-center gap-4 mb-8">
+            <img src={logoKaza9} alt="KAZA9" className="h-16 w-16 rounded-xl" />
             <div>
               <h1 className="text-3xl font-display font-bold text-primary-foreground">KAZA9</h1>
-              <p className="text-primary-foreground/70 text-sm">IMÓVEIS</p>
+              <p className="text-primary-foreground/70 text-sm tracking-widest">IMÓVEIS</p>
             </div>
           </div>
           
@@ -123,12 +122,10 @@ export default function Auth() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="p-2 bg-primary rounded-lg">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
-            </div>
+            <img src={logoKaza9} alt="KAZA9" className="h-12 w-12 rounded-lg" />
             <div>
               <h1 className="text-xl font-display font-bold text-foreground">KAZA9</h1>
-              <p className="text-muted-foreground text-xs">IMÓVEIS</p>
+              <p className="text-muted-foreground text-xs tracking-widest">IMÓVEIS</p>
             </div>
           </div>
 
