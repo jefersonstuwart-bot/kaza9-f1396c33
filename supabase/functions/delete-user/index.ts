@@ -25,7 +25,7 @@ serve(async (req) => {
 
     // Get authorization header to identify the caller
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Não autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -41,19 +41,23 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get current user
-    const { data: { user: currentUser }, error: userError } = await supabaseUser.auth.getUser();
+    // Validate JWT using getClaims instead of getUser (more reliable)
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
     
-    if (userError || !currentUser) {
-      console.error("User auth error:", userError);
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT claims error:", claimsError);
       return new Response(
         JSON.stringify({ error: "Usuário não autenticado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const currentUserId = claimsData.claims.sub;
+    console.log("Authenticated user ID:", currentUserId);
+
     // Prevent self-deletion
-    if (currentUser.id === user_id) {
+    if (currentUserId === user_id) {
       return new Response(
         JSON.stringify({ error: "Você não pode excluir sua própria conta" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -72,7 +76,7 @@ serve(async (req) => {
     const { data: callerRole, error: roleCheckError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", currentUser.id)
+      .eq("user_id", currentUserId)
       .maybeSingle();
 
     console.log("Caller role:", callerRole);
