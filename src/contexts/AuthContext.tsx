@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(roleData.role as UserRole);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Erro ao carregar perfil:', error);
     }
   };
 
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        console.error('Session error:', error);
+        console.error('Erro de sessão:', error);
         // Check for specific refresh token errors
         if (error.message?.includes('Refresh Token') || 
             error.message?.includes('refresh_token') ||
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false);
     }).catch((error) => {
-      console.error('Failed to get session:', error);
+      console.error('Falha ao obter sessão:', error);
       // Clear invalid tokens on any session error
       clearInvalidSession();
     });
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
       
       if (profileError) {
-        console.error('Error checking user status:', profileError);
+        console.error('Erro ao verificar status do usuário:', profileError);
       }
       
       if (profileData && !profileData.ativo) {
