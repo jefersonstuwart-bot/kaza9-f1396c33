@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { USER_ROLE_LABELS } from '@/types/crm';
+import logoKaza9 from '@/assets/logo-kaza9.png';
 
 const mainNavItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
@@ -76,16 +77,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Building2 className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-lg font-display font-bold text-sidebar-foreground">KAZA9</span>
-              <span className="text-xs text-sidebar-foreground/60">IMÓVEIS</span>
-            </div>
-          )}
+        <div className="flex items-center justify-center">
+          <img 
+            src={logoKaza9} 
+            alt="KAZA9 Imóveis" 
+            className={collapsed ? "h-10 w-auto" : "h-14 w-auto"}
+          />
         </div>
       </SidebarHeader>
 

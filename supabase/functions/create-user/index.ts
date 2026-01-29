@@ -14,6 +14,8 @@ serve(async (req) => {
   try {
     const { email, password, nome, role } = await req.json();
 
+    console.log("Creating user with role:", role);
+
     if (!email || !password || !nome) {
       return new Response(
         JSON.stringify({ error: "Email, password e nome são obrigatórios" }),
@@ -43,6 +45,7 @@ serve(async (req) => {
     const { data: { user: currentUser }, error: userError } = await supabaseUser.auth.getUser();
     
     if (userError || !currentUser) {
+      console.error("User auth error:", userError);
       return new Response(
         JSON.stringify({ error: "Usuário não autenticado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -64,7 +67,10 @@ serve(async (req) => {
       .eq("user_id", currentUser.id)
       .maybeSingle();
 
+    console.log("Caller role:", callerRole);
+
     if (roleCheckError || !callerRole) {
+      console.error("Role check error:", roleCheckError);
       return new Response(
         JSON.stringify({ error: "Não foi possível verificar permissões" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -84,6 +90,8 @@ serve(async (req) => {
     // Gerentes só podem criar CORRETORES
     const targetRole = isGerente ? "CORRETOR" : (role || "CORRETOR");
     
+    console.log("Target role for new user:", targetRole);
+
     if (isGerente && role && role !== "CORRETOR") {
       return new Response(
         JSON.stringify({ error: "Gerentes só podem criar corretores" }),
@@ -101,6 +109,7 @@ serve(async (req) => {
         .maybeSingle();
       
       gerenteProfileId = callerProfile?.id || null;
+      console.log("Gerente profile ID:", gerenteProfileId);
     }
 
     // Create user with admin client (bypasses email confirmation)
@@ -130,23 +139,35 @@ serve(async (req) => {
       );
     }
 
-    // Update role to target role
-    if (targetRole !== "CORRETOR") {
-      const { error: roleError } = await supabaseAdmin
-        .from("user_roles")
-        .update({ role: targetRole })
-        .eq("user_id", authData.user.id);
+    console.log("User created with ID:", authData.user.id);
 
-      if (roleError) {
-        console.error("Role update error:", roleError);
+    // Wait for the trigger to create the profile and role
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Now update the role - the trigger creates it as CORRETOR by default
+    // We need to update it to the target role
+    const { data: roleUpdateData, error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .update({ role: targetRole })
+      .eq("user_id", authData.user.id)
+      .select();
+
+    console.log("Role update result:", roleUpdateData, "Error:", roleError);
+
+    if (roleError) {
+      console.error("Role update error:", roleError);
+      // Try inserting if update failed (in case trigger didn't create it)
+      const { error: insertError } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: authData.user.id, role: targetRole });
+      
+      if (insertError) {
+        console.error("Role insert error:", insertError);
       }
     }
 
     // If created by gerente, set the gerente_id on the new user's profile
     if (isGerente && gerenteProfileId) {
-      // Wait a bit for the trigger to create the profile
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
         .update({ gerente_id: gerenteProfileId })
@@ -157,11 +178,21 @@ serve(async (req) => {
       }
     }
 
+    // Verify the role was set correctly
+    const { data: verifyRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id)
+      .maybeSingle();
+    
+    console.log("Final role verification:", verifyRole);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `${targetRole === "CORRETOR" ? "Corretor" : targetRole} criado com sucesso!`,
-        user_id: authData.user.id 
+        message: `${targetRole === "CORRETOR" ? "Corretor" : targetRole === "GERENTE" ? "Gerente" : "Diretor"} criado com sucesso!`,
+        user_id: authData.user.id,
+        role: verifyRole?.role || targetRole
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
