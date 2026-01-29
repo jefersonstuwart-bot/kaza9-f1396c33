@@ -55,9 +55,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Clear invalid tokens from localStorage
+  const clearInvalidSession = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // Ignore signOut errors
+    }
+    // Clear any remaining localStorage items
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('sb-'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    setRole(null);
+    setLoading(false);
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Handle token refresh errors
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          clearInvalidSession();
+          return;
+        }
+        
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setRole(null);
+          setLoading(false);
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -76,6 +115,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Session error:', error);
+        // Check for specific refresh token errors
+        if (error.message?.includes('Refresh Token') || 
+            error.message?.includes('refresh_token') ||
+            (error as any).code === 'refresh_token_not_found') {
+          clearInvalidSession();
+          return;
+        }
         // Clear invalid session state
         setSession(null);
         setUser(null);
@@ -93,11 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }).catch((error) => {
       console.error('Failed to get session:', error);
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      setRole(null);
-      setLoading(false);
+      // Clear invalid tokens on any session error
+      clearInvalidSession();
     });
 
     return () => subscription.unsubscribe();
