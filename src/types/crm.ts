@@ -104,6 +104,55 @@ export interface ComissaoConfig {
   updated_at: string;
 }
 
+// Manager commission tier (ranges like 1-5, 6-10, 11+)
+export interface ComissaoGerenteFaixa {
+  id: string;
+  faixa_inicio: number;
+  faixa_fim: number | null; // NULL means "or more" (e.g., 11+)
+  percentual: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Manager commission for a specific period
+export interface ComissaoGerentePeriodo {
+  id: string;
+  gerente_id: string;
+  mes: number;
+  ano: number;
+  total_vendas: number;
+  valor_vgv_total: number;
+  faixa_id: string | null;
+  percentual_aplicado: number | null;
+  valor_comissao: number | null;
+  created_at: string;
+  updated_at: string;
+  faixa?: ComissaoGerenteFaixa;
+}
+
+// History of tier changes
+export interface ComissaoGerenteFaixaHistorico {
+  id: string;
+  faixa_id: string;
+  acao: 'CRIADO' | 'ATUALIZADO' | 'ATIVADO' | 'DESATIVADO';
+  percentual_anterior: number | null;
+  percentual_novo: number | null;
+  usuario_id: string | null;
+  created_at: string;
+  usuario?: Profile;
+}
+
+// Calculated manager commission result
+export interface GerenteComissaoCalculo {
+  total_vendas: number;
+  valor_vgv_total: number;
+  faixa_id: string | null;
+  percentual_aplicado: number;
+  valor_comissao: number;
+  vendas_para_proxima_faixa: number;
+}
+
 export interface Alerta {
   id: string;
   usuario_id: string | null;

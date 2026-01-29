@@ -132,6 +132,138 @@ export type Database = {
         }
         Relationships: []
       }
+      comissao_gerente_faixas: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          faixa_fim: number | null
+          faixa_inicio: number
+          id: string
+          percentual: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          faixa_fim?: number | null
+          faixa_inicio: number
+          id?: string
+          percentual: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          faixa_fim?: number | null
+          faixa_inicio?: number
+          id?: string
+          percentual?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      comissao_gerente_faixas_historico: {
+        Row: {
+          acao: string
+          created_at: string
+          faixa_id: string
+          id: string
+          percentual_anterior: number | null
+          percentual_novo: number | null
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          faixa_id: string
+          id?: string
+          percentual_anterior?: number | null
+          percentual_novo?: number | null
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          faixa_id?: string
+          id?: string
+          percentual_anterior?: number | null
+          percentual_novo?: number | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comissao_gerente_faixas_historico_faixa_id_fkey"
+            columns: ["faixa_id"]
+            isOneToOne: false
+            referencedRelation: "comissao_gerente_faixas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissao_gerente_faixas_historico_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comissao_gerente_periodo: {
+        Row: {
+          ano: number
+          created_at: string
+          faixa_id: string | null
+          gerente_id: string
+          id: string
+          mes: number
+          percentual_aplicado: number | null
+          total_vendas: number
+          updated_at: string
+          valor_comissao: number | null
+          valor_vgv_total: number
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          faixa_id?: string | null
+          gerente_id: string
+          id?: string
+          mes: number
+          percentual_aplicado?: number | null
+          total_vendas?: number
+          updated_at?: string
+          valor_comissao?: number | null
+          valor_vgv_total?: number
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          faixa_id?: string | null
+          gerente_id?: string
+          id?: string
+          mes?: number
+          percentual_aplicado?: number | null
+          total_vendas?: number
+          updated_at?: string
+          valor_comissao?: number | null
+          valor_vgv_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comissao_gerente_periodo_faixa_id_fkey"
+            columns: ["faixa_id"]
+            isOneToOne: false
+            referencedRelation: "comissao_gerente_faixas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissao_gerente_periodo_gerente_id_fkey"
+            columns: ["gerente_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comissao_periodo_config: {
         Row: {
           ativo: boolean | null
@@ -556,6 +688,17 @@ export type Database = {
           valor_comissao: number
         }[]
       }
+      calculate_gerente_commission: {
+        Args: { _ano: number; _gerente_id: string; _mes: number }
+        Returns: {
+          faixa_id: string
+          percentual_aplicado: number
+          total_vendas: number
+          valor_comissao: number
+          valor_vgv_total: number
+          vendas_para_proxima_faixa: number
+        }[]
+      }
       get_profile_id: { Args: { _user_id: string }; Returns: string }
       get_vendas_count_in_period: {
         Args: { _corretor_id: string; _data_venda: string }
@@ -571,6 +714,10 @@ export type Database = {
       is_manager_of: {
         Args: { _manager_user_id: string; _user_profile_id: string }
         Returns: boolean
+      }
+      update_gerente_commission: {
+        Args: { _ano: number; _gerente_id: string; _mes: number }
+        Returns: undefined
       }
     }
     Enums: {
