@@ -142,28 +142,31 @@ serve(async (req) => {
     console.log("User created with ID:", authData.user.id);
 
     // Wait for the trigger to create the profile and role
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Now update the role - the trigger creates it as CORRETOR by default
-    // We need to update it to the target role
-    const { data: roleUpdateData, error: roleError } = await supabaseAdmin
+    // Delete existing role and insert the correct one
+    // The trigger creates it as CORRETOR by default, so we need to replace it
+    console.log("Deleting existing role for user:", authData.user.id);
+    const { error: deleteError } = await supabaseAdmin
       .from("user_roles")
-      .update({ role: targetRole })
-      .eq("user_id", authData.user.id)
+      .delete()
+      .eq("user_id", authData.user.id);
+
+    if (deleteError) {
+      console.error("Role delete error:", deleteError);
+    }
+
+    // Insert the correct role
+    console.log("Inserting new role:", targetRole);
+    const { data: roleInsertData, error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: authData.user.id, role: targetRole })
       .select();
 
-    console.log("Role update result:", roleUpdateData, "Error:", roleError);
+    console.log("Role insert result:", roleInsertData, "Error:", roleError);
 
     if (roleError) {
-      console.error("Role update error:", roleError);
-      // Try inserting if update failed (in case trigger didn't create it)
-      const { error: insertError } = await supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: authData.user.id, role: targetRole });
-      
-      if (insertError) {
-        console.error("Role insert error:", insertError);
-      }
+      console.error("Role insert error:", roleError);
     }
 
     // If created by gerente, set the gerente_id on the new user's profile
