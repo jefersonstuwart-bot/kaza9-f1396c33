@@ -10,7 +10,8 @@ import {
   User,
   MoreHorizontal,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -202,6 +203,34 @@ export default function Vendas() {
       toast({
         title: 'Erro',
         description: 'Não foi possível atualizar a venda.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteVenda = async (vendaId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('vendas')
+        .delete()
+        .eq('id', vendaId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Venda excluída',
+        description: 'A venda foi removida com sucesso.',
+      });
+      fetchVendas();
+    } catch (error) {
+      console.error('Error deleting venda:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir a venda.',
         variant: 'destructive',
       });
     }
@@ -496,6 +525,18 @@ export default function Vendas() {
                                   onClick={() => handleDistrato(venda.id)}
                                 >
                                   Registrar Distrato
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {isDirector && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteVenda(venda.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Excluir Venda
                                 </DropdownMenuItem>
                               </>
                             )}
