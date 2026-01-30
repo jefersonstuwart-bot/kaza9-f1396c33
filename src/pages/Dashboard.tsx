@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -26,6 +26,7 @@ import {
   Cell,
 } from 'recharts';
 import ComissaoCorretorCard from '@/components/comissao/ComissaoCorretorCard';
+import { useMountedState } from '@/hooks/useRealtimeSubscription';
 
 interface DashboardData {
   totalLeads: number;
@@ -53,6 +54,9 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
 
 export default function Dashboard() {
   const { profile } = useAuth();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [data, setData] = useState<DashboardData>({
     totalLeads: 0,
     totalLeadsMesAnterior: 0,
@@ -69,12 +73,10 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [profile]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!profile) return;
+    
+    const fetchId = ++fetchIdRef.current;
 
     try {
       const currentDate = new Date();
@@ -157,6 +159,9 @@ export default function Dashboard() {
         .eq('ano', currentYear)
         .maybeSingle();
 
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
+
       setData({
         totalLeads: leadsCurrentMonth?.length || 0,
         totalLeadsMesAnterior: leadsPrevMonth?.length || 0,
@@ -172,11 +177,19 @@ export default function Dashboard() {
         realizadoQtdVendas: vendasAtivasCurrentMonth.length,
       });
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      if (isMounted()) {
+        console.error('Error fetching dashboard data:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [profile, isMounted]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

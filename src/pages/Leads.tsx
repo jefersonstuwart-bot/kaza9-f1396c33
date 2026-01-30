@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -54,6 +54,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { LEAD_STATUS_CONFIG, type Lead, type LeadOrigem, type LeadStatus } from '@/types/crm';
 import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
+import { useRealtimeSubscription, useMountedState } from '@/hooks/useRealtimeSubscription';
 import { z } from 'zod';
 
 const leadSchema = z.object({
@@ -67,6 +68,9 @@ const leadSchema = z.object({
 export default function Leads() {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [leads, setLeads] = useState<Lead[]>([]);
   const [origens, setOrigens] = useState<LeadOrigem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,24 +90,10 @@ export default function Leads() {
     notas: '',
   });
 
-  useEffect(() => {
-    fetchLeads();
-    fetchOrigens();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('leads-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-        fetchLeads();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchLeads = async () => {
+  // Fetch leads com proteção contra race conditions
+  const fetchLeads = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    
     try {
       const { data, error } = await supabase
         .from('leads')
@@ -114,16 +104,23 @@ export default function Leads() {
         `)
         .order('data_criacao', { ascending: false });
 
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
+      
       if (error) throw error;
       setLeads((data as Lead[]) || []);
     } catch (error) {
-      console.error('Error fetching leads:', error);
+      if (isMounted()) {
+        console.error('Error fetching leads:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [isMounted]);
 
-  const fetchOrigens = async () => {
+  const fetchOrigens = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('lead_origens')
@@ -131,12 +128,30 @@ export default function Leads() {
         .eq('ativo', true)
         .order('nome');
 
+      if (!isMounted()) return;
       if (error) throw error;
       setOrigens(data || []);
     } catch (error) {
-      console.error('Error fetching origens:', error);
+      if (isMounted()) {
+        console.error('Error fetching origens:', error);
+      }
     }
-  };
+  }, [isMounted]);
+
+  // Subscription realtime isolada com cleanup automático
+  useRealtimeSubscription(
+    { table: 'leads' },
+    useCallback(() => {
+      fetchLeads();
+    }, [fetchLeads]),
+    true
+  );
+
+  useEffect(() => {
+    fetchLeads();
+    fetchOrigens();
+  }, [fetchLeads, fetchOrigens]);
+
 
   const handleCreateLead = async () => {
     try {

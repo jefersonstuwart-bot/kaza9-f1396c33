@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -52,6 +52,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type { Venda, Construtora, VendaStatus } from '@/types/crm';
+import { useRealtimeSubscription, useMountedState } from '@/hooks/useRealtimeSubscription';
 import { z } from 'zod';
 
 const vendaSchema = z.object({
@@ -64,6 +65,9 @@ const vendaSchema = z.object({
 export default function Vendas() {
   const { profile, isDirector } = useAuth();
   const { toast } = useToast();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [construtoras, setConstrutoras] = useState<Construtora[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,23 +82,10 @@ export default function Vendas() {
     observacao: '',
   });
 
-  useEffect(() => {
-    fetchVendas();
-    fetchConstrutoras();
-
-    const channel = supabase
-      .channel('vendas-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, () => {
-        fetchVendas();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchVendas = async () => {
+  // Fetch vendas com proteção contra race conditions
+  const fetchVendas = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    
     try {
       const { data, error } = await supabase
         .from('vendas')
@@ -106,16 +97,23 @@ export default function Vendas() {
         `)
         .order('data_venda', { ascending: false });
 
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
+      
       if (error) throw error;
       setVendas((data as Venda[]) || []);
     } catch (error) {
-      console.error('Error fetching vendas:', error);
+      if (isMounted()) {
+        console.error('Error fetching vendas:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [isMounted]);
 
-  const fetchConstrutoras = async () => {
+  const fetchConstrutoras = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('construtoras')
@@ -123,12 +121,30 @@ export default function Vendas() {
         .eq('ativo', true)
         .order('nome');
 
+      if (!isMounted()) return;
       if (error) throw error;
       setConstrutoras(data || []);
     } catch (error) {
-      console.error('Error fetching construtoras:', error);
+      if (isMounted()) {
+        console.error('Error fetching construtoras:', error);
+      }
     }
-  };
+  }, [isMounted]);
+
+  // Subscription realtime isolada com cleanup automático
+  useRealtimeSubscription(
+    { table: 'vendas' },
+    useCallback(() => {
+      fetchVendas();
+    }, [fetchVendas]),
+    true
+  );
+
+  useEffect(() => {
+    fetchVendas();
+    fetchConstrutoras();
+  }, [fetchVendas, fetchConstrutoras]);
+
 
   const handleCreateVenda = async () => {
     try {

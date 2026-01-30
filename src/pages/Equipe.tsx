@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -67,6 +67,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useMountedState } from '@/hooks/useRealtimeSubscription';
 import { 
   USER_ROLE_LABELS, 
   NIVEL_CORRETOR_LABELS, 
@@ -98,6 +99,9 @@ interface UserWithRole extends Profile {
 export default function Equipe() {
   const { isDirector, isGerente, profile: currentProfile } = useAuth();
   const { toast } = useToast();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -133,12 +137,7 @@ export default function Equipe() {
     role: 'CORRETOR' as UserRole,
   });
 
-  useEffect(() => {
-    fetchUsers();
-    fetchComissoes();
-  }, []);
-
-  const fetchComissoes = async () => {
+  const fetchComissoes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('comissao_config')
@@ -146,12 +145,15 @@ export default function Equipe() {
         .eq('tipo', 'CORRETOR_NIVEL')
         .eq('ativo', true);
 
+      if (!isMounted()) return;
       if (error) throw error;
       setComissoes(data || []);
     } catch (error) {
-      console.error('Error fetching comissoes:', error);
+      if (isMounted()) {
+        console.error('Error fetching comissoes:', error);
+      }
     }
-  };
+  }, [isMounted]);
 
   const getComissaoByNivel = (nivel: NivelCorretor | null) => {
     if (!nivel) return null;
@@ -159,12 +161,17 @@ export default function Equipe() {
     return config?.percentual;
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('nome');
+
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
 
       if (profilesError) throw profilesError;
 
@@ -184,13 +191,25 @@ export default function Equipe() {
         });
       }
 
-      setUsers(usersWithRoles);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setUsers(usersWithRoles);
+      }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      if (isMounted()) {
+        console.error('Error fetching users:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [isMounted]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchComissoes();
+  }, [fetchUsers, fetchComissoes]);
+
 
   const handleEditUser = (user: UserWithRole) => {
     setSelectedUser(user);
