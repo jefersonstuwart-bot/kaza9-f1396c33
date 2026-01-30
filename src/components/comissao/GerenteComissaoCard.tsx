@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { ComissaoGerenteFaixa } from '@/types/crm';
+import { useMountedState } from '@/hooks/useRealtimeSubscription';
 
 interface GerenteComissaoData {
   total_vendas: number;
@@ -27,6 +28,9 @@ interface GerenteComissaoData {
 
 export default function GerenteComissaoCard() {
   const { profile, isGerente } = useAuth();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [loading, setLoading] = useState(true);
   const [comissaoData, setComissaoData] = useState<GerenteComissaoData | null>(null);
   const [faixas, setFaixas] = useState<ComissaoGerenteFaixa[]>([]);
@@ -36,15 +40,9 @@ export default function GerenteComissaoCard() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    if (isGerente && profile?.id) {
-      fetchData();
-    } else {
-      setLoading(false);
-    }
-  }, [isGerente, profile?.id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    
     try {
       // Fetch commission calculation using RPC
       const { data: calcData, error: calcError } = await supabase.rpc(
@@ -55,6 +53,9 @@ export default function GerenteComissaoCard() {
           _ano: currentYear,
         }
       );
+
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
 
       if (calcError) {
         console.error('Error calculating commission:', calcError);
@@ -68,6 +69,8 @@ export default function GerenteComissaoCard() {
         .select('*')
         .eq('ativo', true)
         .order('faixa_inicio');
+
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
 
       if (faixasError) throw faixasError;
       setFaixas((faixasData as ComissaoGerenteFaixa[]) || []);
@@ -85,11 +88,23 @@ export default function GerenteComissaoCard() {
         setProximaFaixa(next as ComissaoGerenteFaixa || null);
       }
     } catch (error) {
-      console.error('Error fetching gerente comissao:', error);
+      if (isMounted()) {
+        console.error('Error fetching gerente comissao:', error);
+      }
     } finally {
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
+    }
+  }, [profile, currentMonth, currentYear, isMounted]);
+
+  useEffect(() => {
+    if (isGerente && profile?.id) {
+      fetchData();
+    } else {
       setLoading(false);
     }
-  };
+  }, [isGerente, profile?.id, fetchData]);
 
   const formatFaixaLabel = (faixa: ComissaoGerenteFaixa) => {
     if (faixa.faixa_fim === null) {

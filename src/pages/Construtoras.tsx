@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -36,6 +36,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import type { Construtora } from '@/types/crm';
+import { useMountedState } from '@/hooks/useRealtimeSubscription';
 import { z } from 'zod';
 
 const construtoraSchema = z.object({
@@ -48,6 +49,9 @@ const construtoraSchema = z.object({
 export default function Construtoras() {
   const { isDirector } = useAuth();
   const { toast } = useToast();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [construtoras, setConstrutoras] = useState<Construtora[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -65,25 +69,34 @@ export default function Construtoras() {
     ativo: true,
   });
 
-  useEffect(() => {
-    fetchConstrutoras();
-  }, []);
-
-  const fetchConstrutoras = async () => {
+  const fetchConstrutoras = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    
     try {
       const { data, error } = await supabase
         .from('construtoras')
         .select('*')
         .order('nome');
 
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
+
       if (error) throw error;
       setConstrutoras(data || []);
     } catch (error) {
-      console.error('Error fetching construtoras:', error);
+      if (isMounted()) {
+        console.error('Error fetching construtoras:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [isMounted]);
+
+  useEffect(() => {
+    fetchConstrutoras();
+  }, [fetchConstrutoras]);
 
   const handleUploadPhoto = async (file: File) => {
     try {

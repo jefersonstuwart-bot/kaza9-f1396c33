@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Percent, TrendingUp, DollarSign, Target, Loader2, Wallet } from 'lucide-react';
 import { NIVEL_CORRETOR_LABELS, type NivelCorretor } from '@/types/crm';
+import { useMountedState } from '@/hooks/useRealtimeSubscription';
 
 interface ComissaoFaixa {
   numero_venda: number;
@@ -23,18 +24,17 @@ interface VendaComissao {
 
 export default function ComissaoCorretorCard() {
   const { profile } = useAuth();
+  const isMounted = useMountedState();
+  const fetchIdRef = useRef(0);
+  
   const [vendas, setVendas] = useState<VendaComissao[]>([]);
   const [faixas, setFaixas] = useState<ComissaoFaixa[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (profile?.id) {
-      fetchData();
-    }
-  }, [profile?.id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!profile?.id || !profile?.nivel_corretor) return;
+    
+    const fetchId = ++fetchIdRef.current;
 
     try {
       // Get current period boundaries (mensal by default)
@@ -59,17 +59,30 @@ export default function ComissaoCorretorCard() {
           .order('numero_venda'),
       ]);
 
+      // Verificar se ainda é a requisição mais recente e componente está montado
+      if (fetchId !== fetchIdRef.current || !isMounted()) return;
+
       if (vendasResult.error) throw vendasResult.error;
       if (faixasResult.error) throw faixasResult.error;
 
       setVendas((vendasResult.data as VendaComissao[]) || []);
       setFaixas((faixasResult.data as ComissaoFaixa[]) || []);
     } catch (error) {
-      console.error('Error fetching comissao data:', error);
+      if (isMounted()) {
+        console.error('Error fetching comissao data:', error);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current && isMounted()) {
+        setLoading(false);
+      }
     }
-  };
+  }, [profile?.id, profile?.nivel_corretor, isMounted]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchData();
+    }
+  }, [profile?.id, fetchData]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
