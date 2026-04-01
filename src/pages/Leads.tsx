@@ -312,7 +312,7 @@ export default function Leads() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="origem">Origem</Label>
+                <Label htmlFor="origem">Origem *</Label>
                 <Select
                   value={formData.origem_id}
                   onValueChange={(value) => setFormData({ ...formData, origem_id: value })}
