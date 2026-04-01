@@ -11,7 +11,8 @@ import {
   MoreHorizontal,
   TrendingUp,
   AlertCircle,
-  Trash2
+  Trash2,
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type { Venda, Construtora, VendaStatus } from '@/types/crm';
 import { useRealtimeSubscription, useMountedState } from '@/hooks/useRealtimeSubscription';
+import { VendaDetailsDialog } from '@/components/vendas/VendaDetailsDialog';
 import { z } from 'zod';
 
 const vendaSchema = z.object({
@@ -61,6 +63,21 @@ const vendaSchema = z.object({
   data_venda: z.string().min(1, 'Data é obrigatória'),
   observacao: z.string().optional(),
 });
+
+const MONTHS = [
+  { value: '1', label: 'Janeiro' },
+  { value: '2', label: 'Fevereiro' },
+  { value: '3', label: 'Março' },
+  { value: '4', label: 'Abril' },
+  { value: '5', label: 'Maio' },
+  { value: '6', label: 'Junho' },
+  { value: '7', label: 'Julho' },
+  { value: '8', label: 'Agosto' },
+  { value: '9', label: 'Setembro' },
+  { value: '10', label: 'Outubro' },
+  { value: '11', label: 'Novembro' },
+  { value: '12', label: 'Dezembro' },
+];
 
 export default function Vendas() {
   const { profile, isDirector } = useAuth();
@@ -74,6 +91,13 @@ export default function Vendas() {
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedVenda, setSelectedVenda] = useState<Venda | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Month filter state
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(now.getMonth() + 1));
+  const [selectedYear, setSelectedYear] = useState<string>(String(now.getFullYear()));
 
   const [formData, setFormData] = useState({
     construtora_id: '',
@@ -87,21 +111,29 @@ export default function Vendas() {
     const fetchId = ++fetchIdRef.current;
     
     try {
+      const month = parseInt(selectedMonth);
+      const year = parseInt(selectedYear);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+
       const { data, error } = await supabase
         .from('vendas')
         .select(`
           *,
           construtora:construtoras(*),
           corretor:profiles!vendas_corretor_id_fkey(*),
-          gerente:profiles!vendas_gerente_id_fkey(*)
+          gerente:profiles!vendas_gerente_id_fkey(*),
+          lead:leads(id, nome, telefone, email)
         `)
-        .order('data_venda', { ascending: false });
+        .gte('data_venda', startDate.toISOString().split('T')[0])
+        .lte('data_venda', endDate.toISOString().split('T')[0])
+        .order('data_venda', { ascending: true });
 
       // Verificar se ainda é a requisição mais recente e componente está montado
       if (fetchId !== fetchIdRef.current || !isMounted()) return;
       
       if (error) throw error;
-      setVendas((data as Venda[]) || []);
+      setVendas((data as unknown as Venda[]) || []);
     } catch (error) {
       if (isMounted()) {
         console.error('Error fetching vendas:', error);
@@ -111,7 +143,7 @@ export default function Vendas() {
         setLoading(false);
       }
     }
-  }, [isMounted]);
+  }, [isMounted, selectedMonth, selectedYear]);
 
   const fetchConstrutoras = useCallback(async () => {
     try {
@@ -225,7 +257,7 @@ export default function Vendas() {
   };
 
   const handleDeleteVenda = async (vendaId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.')) {
+    if (!confirm('Tem certeza que deseja excluir esta venda? As comissões serão recalculadas automaticamente.')) {
       return;
     }
 
@@ -239,7 +271,7 @@ export default function Vendas() {
 
       toast({
         title: 'Venda excluída',
-        description: 'A venda foi removida com sucesso.',
+        description: 'A venda foi removida e as comissões foram recalculadas.',
       });
       fetchVendas();
     } catch (error) {
@@ -268,6 +300,10 @@ export default function Vendas() {
     }).format(amount);
   };
 
+  const formatPercent = (value: number) => {
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + '%';
+  };
+
   const formatDate = (date: string) => {
     return new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -276,10 +312,20 @@ export default function Vendas() {
     });
   };
 
+  const handleQuickFilter = (type: 'current' | 'previous') => {
+    const d = new Date();
+    if (type === 'previous') {
+      d.setMonth(d.getMonth() - 1);
+    }
+    setSelectedMonth(String(d.getMonth() + 1));
+    setSelectedYear(String(d.getFullYear()));
+  };
+
   const filteredVendas = vendas.filter((venda) => {
     return (
       venda.construtora?.nome?.toLowerCase().includes(search.toLowerCase()) ||
-      venda.corretor?.nome?.toLowerCase().includes(search.toLowerCase())
+      venda.corretor?.nome?.toLowerCase().includes(search.toLowerCase()) ||
+      (venda.lead as any)?.nome?.toLowerCase().includes(search.toLowerCase())
     );
   });
 
@@ -291,13 +337,21 @@ export default function Vendas() {
     .filter(v => v.status === 'DISTRATO')
     .reduce((sum, v) => sum + Number(v.valor_vgv), 0);
 
+  const totalComissao = filteredVendas
+    .filter(v => v.status === 'ATIVA')
+    .reduce((sum, v) => sum + Number((v as any).valor_comissao || 0), 0);
+
+  const selectedMonthLabel = MONTHS.find(m => m.value === selectedMonth)?.label || '';
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Vendas</h1>
-          <p className="text-muted-foreground">Acompanhe todas as vendas em tempo real</p>
+          <p className="text-muted-foreground">
+            {selectedMonthLabel} {selectedYear} • Acompanhe todas as vendas em tempo real
+          </p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -379,8 +433,67 @@ export default function Vendas() {
         </Dialog>
       </div>
 
+      {/* Month Filter */}
+      <Card className="card-elevated">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Filter className="h-4 w-4" />
+              Período:
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFilter('current')}
+                className={
+                  selectedMonth === String(now.getMonth() + 1) && selectedYear === String(now.getFullYear())
+                    ? 'bg-accent text-accent-foreground'
+                    : ''
+                }
+              >
+                Mês Atual
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFilter('previous')}
+              >
+                Mês Anterior
+              </Button>
+            </div>
+            <div className="flex gap-2 ml-auto">
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="card-metric">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -390,7 +503,7 @@ export default function Vendas() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{filteredVendas.filter(v => v.status === 'ATIVA').length}</div>
-            <p className="text-sm text-muted-foreground">vendas ativas</p>
+            <p className="text-sm text-muted-foreground">vendas ativas em {selectedMonthLabel}</p>
           </CardContent>
         </Card>
 
@@ -404,6 +517,19 @@ export default function Vendas() {
           <CardContent>
             <div className="text-3xl font-bold text-accent">{formatCurrency(totalVgvAtivo)}</div>
             <p className="text-sm text-muted-foreground">em vendas ativas</p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-metric">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Comissões
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-accent" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-accent">{formatCurrency(totalComissao)}</div>
+            <p className="text-sm text-muted-foreground">total de comissões</p>
           </CardContent>
         </Card>
 
@@ -429,7 +555,7 @@ export default function Vendas() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por construtora ou corretor..."
+              placeholder="Buscar por construtora, corretor ou cliente..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -442,7 +568,7 @@ export default function Vendas() {
       <Card className="card-elevated">
         <CardHeader>
           <CardTitle className="font-display">
-            {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'}
+            {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'} em {selectedMonthLabel}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -450,6 +576,7 @@ export default function Vendas() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
+                  <TableHead className="w-12">#</TableHead>
                   <TableHead>Construtora</TableHead>
                   <TableHead>Corretor</TableHead>
                   <TableHead>VGV</TableHead>
@@ -462,13 +589,22 @@ export default function Vendas() {
               <TableBody>
                 {filteredVendas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       {loading ? 'Carregando...' : 'Nenhuma venda encontrada'}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredVendas.map((venda) => (
                     <TableRow key={venda.id} className="hover:bg-muted/30">
+                      <TableCell>
+                        {venda.status === 'ATIVA' && (venda as any).numero_venda_periodo ? (
+                          <Badge variant="outline" className="text-xs">
+                            {(venda as any).numero_venda_periodo}ª
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
@@ -503,7 +639,7 @@ export default function Vendas() {
                               {formatCurrency(Number((venda as any).valor_comissao) || 0)}
                             </span>
                             <p className="text-xs text-muted-foreground">
-                              {(venda as any).percentual_comissao}% • {(venda as any).numero_venda_periodo}ª venda
+                              {formatPercent(Number((venda as any).percentual_comissao))}
                             </p>
                           </div>
                         ) : (
@@ -532,7 +668,12 @@ export default function Vendas() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver detalhes</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedVenda(venda);
+                              setIsDetailsOpen(true);
+                            }}>
+                              Ver detalhes
+                            </DropdownMenuItem>
                             {isDirector && venda.status === 'ATIVA' && (
                               <>
                                 <DropdownMenuSeparator />
@@ -567,6 +708,13 @@ export default function Vendas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Details Dialog */}
+      <VendaDetailsDialog
+        venda={selectedVenda}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
   );
 }

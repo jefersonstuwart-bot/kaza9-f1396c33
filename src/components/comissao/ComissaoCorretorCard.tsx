@@ -1,17 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Percent, TrendingUp, DollarSign, Target, Loader2, Wallet } from 'lucide-react';
+import { Percent, TrendingUp, DollarSign, Loader2, Wallet } from 'lucide-react';
 import { NIVEL_CORRETOR_LABELS, type NivelCorretor } from '@/types/crm';
 import { useMountedState } from '@/hooks/useRealtimeSubscription';
-
-interface ComissaoFaixa {
-  numero_venda: number;
-  percentual: number;
-}
 
 interface VendaComissao {
   id: string;
@@ -20,6 +15,7 @@ interface VendaComissao {
   valor_comissao: number;
   numero_venda_periodo: number;
   data_venda: string;
+  construtora?: { nome: string } | null;
 }
 
 export default function ComissaoCorretorCard() {
@@ -28,7 +24,6 @@ export default function ComissaoCorretorCard() {
   const fetchIdRef = useRef(0);
   
   const [vendas, setVendas] = useState<VendaComissao[]>([]);
-  const [faixas, setFaixas] = useState<ComissaoFaixa[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -37,36 +32,23 @@ export default function ComissaoCorretorCard() {
     const fetchId = ++fetchIdRef.current;
 
     try {
-      // Get current period boundaries (mensal by default)
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const [vendasResult, faixasResult] = await Promise.all([
-        supabase
-          .from('vendas')
-          .select('id, valor_vgv, percentual_comissao, valor_comissao, numero_venda_periodo, data_venda')
-          .eq('corretor_id', profile.id)
-          .eq('status', 'ATIVA')
-          .gte('data_venda', startOfMonth.toISOString().split('T')[0])
-          .lte('data_venda', endOfMonth.toISOString().split('T')[0])
-          .order('data_venda', { ascending: false }),
-        supabase
-          .from('comissao_faixas')
-          .select('numero_venda, percentual')
-          .eq('nivel_corretor', profile.nivel_corretor)
-          .eq('ativo', true)
-          .order('numero_venda'),
-      ]);
+      const { data, error } = await supabase
+        .from('vendas')
+        .select('id, valor_vgv, percentual_comissao, valor_comissao, numero_venda_periodo, data_venda, construtora:construtoras(nome)')
+        .eq('corretor_id', profile.id)
+        .eq('status', 'ATIVA')
+        .gte('data_venda', startOfMonth.toISOString().split('T')[0])
+        .lte('data_venda', endOfMonth.toISOString().split('T')[0])
+        .order('data_venda', { ascending: true });
 
-      // Verificar se ainda é a requisição mais recente e componente está montado
       if (fetchId !== fetchIdRef.current || !isMounted()) return;
+      if (error) throw error;
 
-      if (vendasResult.error) throw vendasResult.error;
-      if (faixasResult.error) throw faixasResult.error;
-
-      setVendas((vendasResult.data as VendaComissao[]) || []);
-      setFaixas((faixasResult.data as ComissaoFaixa[]) || []);
+      setVendas((data as VendaComissao[]) || []);
     } catch (error) {
       if (isMounted()) {
         console.error('Error fetching comissao data:', error);
@@ -84,12 +66,11 @@ export default function ComissaoCorretorCard() {
     }
   }, [profile?.id, fetchData]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+  const formatPercent = (value: number) =>
+    value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + '%';
 
   if (loading) {
     return (
@@ -113,33 +94,19 @@ export default function ComissaoCorretorCard() {
 
   const vendasCount = vendas.length;
   const nivelCorretor = profile.nivel_corretor;
-  
-  // Check if corretor uses retroactive commission (PLENO, SENIOR, CLOSER)
   const isRetroativo = nivelCorretor !== 'JUNIOR';
-  
-  // Calculate total VGV
   const totalVGV = vendas.reduce((sum, v) => sum + (v.valor_vgv || 0), 0);
   
-  // Find current percentual based on number of sales
-  const maxFaixa = faixas.length > 0 ? Math.max(...faixas.map((f) => f.numero_venda)) : 1;
-  const currentFaixaNum = Math.min(vendasCount, maxFaixa);
-  const currentFaixa = faixas.find((f) => f.numero_venda === currentFaixaNum) || faixas[0];
-  const currentPercentual = currentFaixa?.percentual || 0;
+  // For retroactive, use the highest percentual from vendas (last one)
+  const lastVenda = vendas[vendas.length - 1];
+  const currentPercentual = lastVenda?.percentual_comissao || 0;
   
-  // Calculate total commission
   let totalComissao: number;
   if (isRetroativo) {
-    // Retroactive: apply current percentage to total VGV
     totalComissao = (totalVGV * currentPercentual) / 100;
   } else {
-    // Progressive (JUNIOR): sum individual commissions
     totalComissao = vendas.reduce((sum, v) => sum + (v.valor_comissao || 0), 0);
   }
-
-  // Find next faixa
-  const nextFaixa = faixas.find((f) => f.numero_venda > vendasCount);
-  const vendasParaProximaFaixa = nextFaixa ? nextFaixa.numero_venda - vendasCount : 0;
-  const isMaxFaixa = vendasCount >= maxFaixa;
 
   const currentMonth = new Date().toLocaleDateString('pt-BR', {
     month: 'long',
@@ -155,11 +122,6 @@ export default function ComissaoCorretorCard() {
         </CardTitle>
         <CardDescription className="mt-1">
           {currentMonth} • {NIVEL_CORRETOR_LABELS[profile.nivel_corretor]}
-          {isRetroativo && (
-            <Badge variant="outline" className="ml-2 text-xs">
-              Retroativo
-            </Badge>
-          )}
         </CardDescription>
       </div>
       <CardContent className="pt-6 space-y-6">
@@ -176,7 +138,7 @@ export default function ComissaoCorretorCard() {
           </p>
           {isRetroativo && (
             <p className="text-sm text-muted-foreground mt-2">
-              {currentPercentual}% aplicado sobre VGV de {formatCurrency(totalVGV)}
+              {formatPercent(currentPercentual)} aplicado sobre VGV de {formatCurrency(totalVGV)}
             </p>
           )}
         </div>
@@ -204,71 +166,41 @@ export default function ComissaoCorretorCard() {
               <Percent className="h-4 w-4" />
               Percentual Atual
             </div>
-            <p className="text-2xl font-bold text-accent">{currentPercentual}%</p>
+            <p className="text-2xl font-bold text-accent">{formatPercent(currentPercentual)}</p>
           </div>
         </div>
 
-        {/* Progress to next tier */}
-        {!isMaxFaixa && nextFaixa && (
-          <div className="space-y-2 p-4 rounded-lg bg-muted/30 border">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Target className="h-4 w-4" />
-                Próxima faixa: {nextFaixa.percentual}%
-              </span>
-              <span className="font-medium">
-                {vendasParaProximaFaixa} {vendasParaProximaFaixa === 1 ? 'venda' : 'vendas'} restante
-                {vendasParaProximaFaixa !== 1 && 's'}
-              </span>
+        {/* Individual sales list - corretor sees values but NOT faixa progression */}
+        {vendas.length > 0 && (
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3">Suas Vendas no Período</p>
+            <div className="space-y-2">
+              {vendas.map((v, i) => (
+                <div key={v.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-xs">
+                      {v.numero_venda_periodo || (i + 1)}ª
+                    </Badge>
+                    <div>
+                      <p className="text-sm font-medium">{(v.construtora as any)?.nome || 'Venda'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(v.data_venda + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-accent">
+                      {formatCurrency(isRetroativo ? (v.valor_vgv * currentPercentual / 100) : (v.valor_comissao || 0))}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatPercent(isRetroativo ? currentPercentual : (v.percentual_comissao || 0))} de {formatCurrency(v.valor_vgv)}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Progress
-              value={(vendasCount / nextFaixa.numero_venda) * 100}
-              className="h-3"
-            />
           </div>
         )}
-
-        {isMaxFaixa && (
-          <div className="bg-accent/10 rounded-lg p-4 text-center border border-accent/30">
-            <Badge className="bg-accent mb-2">🎉 Faixa Máxima Atingida!</Badge>
-            <p className="text-sm text-muted-foreground">
-              Você está na maior faixa de comissão: {currentPercentual}%
-            </p>
-          </div>
-        )}
-
-        {/* Faixas Reference */}
-        <div className="border-t pt-4">
-          <p className="text-sm font-medium mb-2">Faixas de Comissão</p>
-          <div className="flex flex-wrap gap-2">
-            {faixas.map((faixa) => (
-              <Badge
-                key={faixa.numero_venda}
-                variant={vendasCount >= faixa.numero_venda ? 'default' : 'outline'}
-                className={vendasCount >= faixa.numero_venda ? 'bg-accent' : ''}
-              >
-                {faixa.numero_venda}ª: {faixa.percentual}%
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        {/* Info about commission type */}
-        <div className="p-3 bg-accent/10 rounded-lg border border-accent/20">
-          <p className="text-sm text-accent-foreground">
-            {isRetroativo ? (
-              <>
-                <strong>Comissão Retroativa:</strong> Quando você atinge uma nova faixa, 
-                o novo percentual é aplicado sobre todo o VGV do período.
-              </>
-            ) : (
-              <>
-                <strong>Comissão Progressiva:</strong> Cada venda recebe o percentual 
-                correspondente à sua posição na sequência de vendas.
-              </>
-            )}
-          </p>
-        </div>
       </CardContent>
     </Card>
   );

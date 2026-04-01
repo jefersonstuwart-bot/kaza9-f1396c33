@@ -61,7 +61,7 @@ const leadSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
   telefone: z.string().regex(/^\d{2}9\d{8}$/, 'Telefone deve ter DDD + 9 + 8 dígitos (ex: 11912345678)'),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
-  origem_id: z.string().optional(),
+  origem_id: z.string().min(1, 'Selecione a origem do lead'),
   notas: z.string().optional(),
 });
 
@@ -312,7 +312,7 @@ export default function Leads() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="origem">Origem</Label>
+                <Label htmlFor="origem">Origem *</Label>
                 <Select
                   value={formData.origem_id}
                   onValueChange={(value) => setFormData({ ...formData, origem_id: value })}
