@@ -715,6 +715,10 @@ export type Database = {
         Args: { _manager_user_id: string; _user_profile_id: string }
         Returns: boolean
       }
+      recalculate_period_commissions: {
+        Args: { _corretor_id: string; _data_venda: string }
+        Returns: undefined
+      }
       update_gerente_commission: {
         Args: { _ano: number; _gerente_id: string; _mes: number }
         Returns: undefined
