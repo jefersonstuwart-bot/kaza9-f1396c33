@@ -133,7 +133,7 @@ export default function Vendas() {
       if (fetchId !== fetchIdRef.current || !isMounted()) return;
       
       if (error) throw error;
-      setVendas((data as Venda[]) || []);
+      setVendas((data as unknown as Venda[]) || []);
     } catch (error) {
       if (isMounted()) {
         console.error('Error fetching vendas:', error);
